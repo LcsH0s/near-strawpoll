@@ -1,4 +1,3 @@
-```markdown
 # NEAR Voting Contract
 
 A simple smart contract for implementing a decentralized voting poll on the NEAR blockchain. This contract enables a poll creator to set up a voting session with a predefined list of allowed voters and candidates. Each allowed voter can cast one vote for their chosen candidate, and the contract ensures that each voter votes only once.
@@ -65,4 +64,3 @@ This project is licensed under the [MIT License](LICENSE).
 ## Contributing
 
 Contributions are welcome! Please open an issue or submit a pull request if you have any suggestions or improvements.
-```
