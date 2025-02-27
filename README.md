@@ -1,37 +1,68 @@
-# near-strawpoll
+```markdown
+# NEAR Voting Contract
 
-cargo-near-new-project-description
+A simple smart contract for implementing a decentralized voting poll on the NEAR blockchain. This contract enables a poll creator to set up a voting session with a predefined list of allowed voters and candidates. Each allowed voter can cast one vote for their chosen candidate, and the contract ensures that each voter votes only once.
 
-## How to Build Locally?
+## Features
 
-Install [`cargo-near`](https://github.com/near/cargo-near) and run:
+- **Restricted Voting:** Only voters included in the allowed voters list can cast a vote.
+- **One Vote Per Voter:** The contract tracks voters to ensure they cannot vote more than once.
+- **Candidate Tallying:** Maintains vote counts for each candidate and allows results to be queried.
+- **Secure Storage:** Uses unique storage prefixes to maintain data integrity on the blockchain.
 
-```bash
-cargo near build
+## Contract Overview
+
+The smart contract is structured with the following key components:
+
+- **poll_creator:** The account that initialized the poll.
+- **allowed_voters:** A set of account IDs that are allowed to vote.
+- **voted_voters:** A set used to track which voters have already cast their vote.
+- **candidates:** A map associating candidate names with their vote counts.
+
+## Functions
+
+### `new(allowed_voters: Vec<AccountId>, candidates: Vec<String>) -> Self`
+- **Purpose:** Initializes the contract with the specified list of allowed voters and candidates.
+- **Behavior:** The account calling this function becomes the poll creator.
+
+### `vote(candidate: String)`
+- **Purpose:** Casts a vote for the specified candidate.
+- **Requirements:**
+  - The caller must be in the allowed voters list.
+  - The caller must not have voted already.
+  - The specified candidate must exist.
+
+### `get_results() -> Vec<(String, u64)>`
+- **Purpose:** Returns the current vote counts for each candidate as a list of `(candidate, vote_count)` tuples.
+
+## Deployment
+
+To deploy the contract on the NEAR blockchain:
+
+1. **Build the Contract:**
+
+   ```bash
+   cargo build --target wasm32-unknown-unknown --release
+   ```
+
+2. **Deploy Using NEAR CLI:**
+
+   ```bash
+   near deploy --wasmFile target/wasm32-unknown-unknown/release/your_contract.wasm --accountId your_account.testnet
+   ```
+
+
+## Prerequisites
+
+- [Rust](https://www.rust-lang.org/)
+- [NEAR CLI](https://docs.near.org/tools/near-cli)
+- [near-sdk-rs](https://github.com/near/near-sdk-rs)
+
+## License
+
+This project is licensed under the [MIT License](LICENSE).
+
+## Contributing
+
+Contributions are welcome! Please open an issue or submit a pull request if you have any suggestions or improvements.
 ```
-
-## How to Test Locally?
-
-```bash
-cargo test
-```
-
-## How to Deploy?
-
-Deployment is automated with GitHub Actions CI/CD pipeline.
-To deploy manually, install [`cargo-near`](https://github.com/near/cargo-near) and run:
-
-```bash
-cargo near deploy build-reproducible-wasm <account-id>
-```
-
-## Useful Links
-
-- [cargo-near](https://github.com/near/cargo-near) - NEAR smart contract development toolkit for Rust
-- [near CLI](https://near.cli.rs) - Interact with NEAR blockchain from command line
-- [NEAR Rust SDK Documentation](https://docs.near.org/sdk/rust/introduction)
-- [NEAR Documentation](https://docs.near.org)
-- [NEAR StackOverflow](https://stackoverflow.com/questions/tagged/nearprotocol)
-- [NEAR Discord](https://near.chat)
-- [NEAR Telegram Developers Community Group](https://t.me/neardev)
-- NEAR DevHub: [Telegram](https://t.me/neardevhub), [Twitter](https://twitter.com/neardevhub)
