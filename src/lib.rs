@@ -1,55 +1,109 @@
-// Find all our documentation at https://docs.near.org
-use near_sdk::{log, near};
+use near_sdk::store::{IterableMap, LookupSet};
+use near_sdk::{env, near, require, AccountId, IntoStorageKey, PanicOnDefault};
 
-// Define the contract structure
-#[near(contract_state)]
-pub struct Contract {
-    greeting: String,
+/// Storage keys for collections to ensure unique prefixes on the blockchain.
+#[near(serializers = [json, borsh])]
+#[derive(Clone)]
+pub enum StorageKey {
+    AllowedVoters,
+    VotedVoters,
+    Candidates,
 }
 
-// Define the default, which automatically initializes the contract
-impl Default for Contract {
-    fn default() -> Self {
-        Self {
-            greeting: "Hello".to_string(),
+impl IntoStorageKey for StorageKey {
+    fn into_storage_key(self) -> Vec<u8> {
+        match self {
+            Self::AllowedVoters => b"av".to_vec(),
+            Self::VotedVoters => b"vv".to_vec(),
+            Self::Candidates => b"c".to_vec(),
         }
     }
 }
 
-// Implement the contract structure
-#[near]
-impl Contract {
-    // Public method - returns the greeting saved, defaulting to DEFAULT_GREETING
-    pub fn get_greeting(&self) -> String {
-        self.greeting.clone()
-    }
-
-    // Public method - accepts a greeting, such as "howdy", and records it
-    pub fn set_greeting(&mut self, greeting: String) {
-        log!("Saving greeting: {greeting}");
-        self.greeting = greeting;
-    }
+/// The VotingContract structure maintains:
+/// - `poll_creator`: The account that created the poll.
+/// - `allowed_voters`: A set of account IDs allowed to vote.
+/// - `voted_voters`: A set tracking which accounts have already voted.
+/// - `candidates`: A map from candidate names to their vote counts.
+#[near(contract_state)]
+#[derive(PanicOnDefault)]
+pub struct VotingContract {
+    poll_creator: AccountId,
+    allowed_voters: LookupSet<AccountId>,
+    voted_voters: LookupSet<AccountId>,
+    candidates: IterableMap<String, u64>,
 }
 
-/*
- * The rest of this file holds the inline tests for the code above
- * Learn more about Rust tests: https://doc.rust-lang.org/book/ch11-01-writing-tests.html
- */
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[near]
+impl VotingContract {
+    /// Initializes the contract.
+    /// * `allowed_voters`: List of accounts allowed to vote.
+    /// * `candidates`: List of candidate names.
+    ///
+    /// The caller becomes the poll creator.
+    #[init]
+    #[private]
+    pub fn new(allowed_voters: Vec<AccountId>, candidates: Vec<String>) -> Self {
+        let mut allowed_set = LookupSet::new(StorageKey::AllowedVoters);
+        for voter in allowed_voters {
+            allowed_set.insert(voter);
+        }
+        let mut candidates_map = IterableMap::new(StorageKey::Candidates);
+        for candidate in candidates {
+            candidates_map.insert(candidate, 0);
+        }
 
-    #[test]
-    fn get_default_greeting() {
-        let contract = Contract::default();
-        // this test did not call set_greeting so should return the default "Hello" greeting
-        assert_eq!(contract.get_greeting(), "Hello");
+        Self {
+            poll_creator: env::predecessor_account_id(),
+            allowed_voters: allowed_set,
+            voted_voters: LookupSet::new(StorageKey::VotedVoters),
+            candidates: candidates_map,
+        }
     }
 
-    #[test]
-    fn set_then_get_greeting() {
-        let mut contract = Contract::default();
-        contract.set_greeting("howdy".to_string());
-        assert_eq!(contract.get_greeting(), "howdy");
+    /// Casts a vote for the given candidate.
+    ///
+    /// # Arguments
+    ///
+    /// * `candidate` - The candidate's name as a string.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the caller is not in the allowed voters list,
+    /// if they have already voted, or if the candidate does not exist.
+    pub fn vote(&mut self, candidate: String) {
+        let voter = env::predecessor_account_id();
+
+        // Ensure the caller is allowed to vote.
+        require!(
+            self.allowed_voters.contains(&voter),
+            "You are not allowed to vote"
+        );
+
+        // Ensure the caller has not already voted.
+        require!(
+            !self.voted_voters.contains(&voter),
+            "You have already voted"
+        );
+
+        // Fetch the current vote count for the candidate.
+        let current_votes = self
+            .candidates
+            .get(&candidate)
+            .unwrap_or_else(|| env::panic_str("Candidate does not exist"));
+
+        // Update the vote count.
+        self.candidates.insert(candidate, current_votes + 1);
+
+        // Mark the voter as having voted.
+        self.voted_voters.insert(voter);
+    }
+
+    /// Returns the voting results as a vector of (candidate, vote_count) tuples.
+    pub fn get_results(&self) -> Vec<(String, u64)> {
+        self.candidates
+            .iter()
+            .map(|e| (e.0.clone(), e.1.clone()))
+            .collect()
     }
 }
